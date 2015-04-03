@@ -30,11 +30,23 @@ namespace BackofficeTweaking.Helpers
         RunScripts = 5
     }
 
+    public class GettingRulesEventArgs : EventArgs
+    {
+        public List<Rule> Rules { get; set; }
+
+        public GettingRulesEventArgs(List<Rule> rules)
+        {
+            Rules = rules;
+        }
+    }
+
     public class ConfigFileHelper
     {
         private const string _CacheIdRules = "BackofficeTweaking.CacheId.CachedRules";
         private const string _CacheIdScripts = "BackofficeTweaking.CacheId.CachedScripts";
         private const string _ConfigFile = "~/Config/BackofficeTweaking.config";
+
+        public static event EventHandler<GettingRulesEventArgs> GettingRules;
 
         public static IEnumerable<Rule> getRulesForUser(IUser user)
         {
@@ -173,7 +185,7 @@ namespace BackofficeTweaking.Helpers
                         xelement.Save(configFilePath);
                     }
 
-                    var Rules = from rule in xelement.Element("Rules").Elements("Rule")
+                    var Rules = (from rule in xelement.Element("Rules").Elements("Rule")
                                 select new Rule()
                                 {
                                     Type = rule.Attribute("Type").Value,
@@ -185,7 +197,11 @@ namespace BackofficeTweaking.Helpers
                                     ParentContentIds = rule.Attributes().Any(a => a.Name.ToString().InvariantEquals("ParentContentIds")) ? rule.Attribute("ParentContentIds").Value : string.Empty,
                                     ContentTypes = rule.Attribute("ContentTypes").Value,
                                     Description = rule.Attribute("Description").Value
-                                };
+                                }).ToList();
+
+                    if (GettingRules != null)
+                        GettingRules(null, new GettingRulesEventArgs(Rules));
+
                     // Cache the result for a year but with a dependency on the config file
                     HttpContext.Current.Cache.Add(_CacheIdRules, Rules, new CacheDependency(configFilePath), DateTime.Now.AddYears(1), Cache.NoSlidingExpiration, System.Web.Caching.CacheItemPriority.NotRemovable, null);
 
